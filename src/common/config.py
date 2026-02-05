@@ -12,10 +12,7 @@ COVID_TIMESERIES_API = (
     "csse_covid_19_data/csse_covid_19_time_series"
 )
 
-WEATHER_API_URL = "https://api.open-meteo.com/v1/forecast"
-
-CITIES = {
-    "london": {"lat": 51.5074, "lon": -0.1278},
-    "new_york": {"lat": 40.7128, "lon": -74.0060},
-    "tokyo": {"lat": 35.6762, "lon": 139.6503}
-}
+COUNTRIES_API_URL = (
+    "https://restcountries.com/v3.1/all"
+    "?fields=name,cca3,population,region,subregion"
+)

@@ -1,12 +1,12 @@
 import requests
 
-from common.config import (
+from src.common.config import (
     S3_BUCKET,
     COVID_TIMESERIES_URL,
     COVID_TIMESERIES_API
 )
-from common.s3_utils import upload_text, list_keys
-from common.logger import get_logger
+from src.common.s3_utils import upload_text, list_keys
+from src.common.logger import get_logger
 
 logger = get_logger("covid_timeseries_sync")
 

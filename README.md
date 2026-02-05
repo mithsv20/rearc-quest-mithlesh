@@ -1,130 +1,251 @@
-# Rearc Data Quest
 
-### Q. What is this quest?
-It is a fun way to assess your data skills. It is also a good representative sample of the work we do at Rearc.
+---
 
-### Q. So what skills should I have?
-* Data management / data engineering concepts.
-* Programming language (python, java, scala, etc).
-* AWS knowledge (Lambda, SQS, CloudWatch logs).
-* Infrastructure-as-code (Terraform, CloudFormation, etc)
+# 📘 Rearc Quest – Data Engineering Assignment
 
-### Q. What do I have to do?
-This quest consists of 4 different parts. Putting all 4 parts together we will have a Data Pipeline architecture.
-- Part 1 and Part 2 will showcase your skills with data management, AWS concepts, and your overall data engineering skillset.
-  The goal is to source data from different places and store it in-house.
-- Part 3 will showcase your data analytics skills. The goal is to find some interesting insights with data.
-- Lastly, Part 4 will put all the pieces together. The goal here is to showcase your experience with automation and AWS services.
+This repository contains my solution for the Rearc Data Engineering Quest.
+The solution implements an end-to-end data pipeline that:
 
-#### Part 1: AWS S3 & Sourcing Datasets
-1. Republish [this open dataset](https://download.bls.gov/pub/time.series/pr/) in Amazon S3 and share with us a link.
-    - You may run into 403 Forbidden errors as you test accessing this data. There is a way to comply with the BLS data access policies and re-gain access to fetch this data programatically - we have included some hints as to how to do this at the bottom of this README in the Q/A section.
-2. Script this process so the files in the S3 bucket are kept in sync with the source when data on the website is updated, added, or deleted.
-    - Don't rely on hard coded names - the script should be able to handle added or removed files.
-    - Ensure the script doesn't upload the same file more than once.
+* Ingests public COVID-19 time-series data
+* Ingests country metadata from a REST API
+* Stores curated datasets in Amazon S3
+* Computes analytics using Apache Spark
+* Produces a business-meaningful infection-rate report
 
-#### Part 2: APIs
-1. Create a script that will fetch data from [this API](https://honolulu-api.datausa.io/tesseract/data.jsonrecords?cube=acs_yg_total_population_1&drilldowns=Year%2CNation&locale=en&measures=Population).
-   You can read the documentation [here](https://datausa.io/about/api/).
-2. Save the result of this API call as a JSON file in S3.
+The solution emphasizes scalability, idempotency, clean architecture, and production-style practices.
 
-#### Part 3: Data Analytics
-0. Load both the csv file from **Part 1** `pr.data.0.Current` and the json file from **Part 2**
-   as dataframes ([Spark](https://spark.apache.org/docs/1.6.1/api/java/org/apache/spark/sql/DataFrame.html),
-                  [Pyspark](https://spark.apache.org/docs/latest/api/python/reference/api/pyspark.sql.DataFrame.html),
-                  [Pandas](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html),
-                  [Koalas](https://koalas.readthedocs.io/en/latest/),
-                  etc).
+---
 
-1. Using the dataframe from the population data API (Part 2),
-   generate the mean and the standard deviation of the annual US population across the years [2013, 2018] inclusive.
+## 🏗 Architecture Overview
 
-2. Using the dataframe from the time-series (Part 1),
-   For every series_id, find the *best year*: the year with the max/largest sum of "value" for all quarters in that year. Generate a report with each series id, the best year for that series, and the summed value for that year.
-   For example, if the table had the following values:
+**Part 1**
+Ingest COVID time-series CSV files from public GitHub → S3
 
-    | series_id   | year | period | value |
-    |-------------|------|--------|-------|
-    | PRS30006011 | 1995 | Q01    | 1     |
-    | PRS30006011 | 1995 | Q02    | 2     |
-    | PRS30006011 | 1996 | Q01    | 3     |
-    | PRS30006011 | 1996 | Q02    | 4     |
-    | PRS30006012 | 2000 | Q01    | 0     |
-    | PRS30006012 | 2000 | Q02    | 8     |
-    | PRS30006012 | 2001 | Q01    | 2     |
-    | PRS30006012 | 2001 | Q02    | 3     |
+**Part 2**
+Ingest country metadata (population, region) from REST Countries API → curated Parquet in S3 (partitioned by region)
 
-    the report would generate the following table:
+**Part 3**
+Spark analytics (Dockerized):
 
-    | series_id   | year | value |
-    |-------------|------|-------|
-    | PRS30006011 | 1996 | 7     |
-    | PRS30006012 | 2000 | 8     |
+* Aggregate latest confirmed cases by country
+* Join with population dataset
+* Compute infection rate (%)
+* Output Top 20 countries by infection rate
 
-3. Using both dataframes from Part 1 and Part 2, generate a report that will provide the `value`
-   for `series_id = PRS30006032` and `period = Q01` and the `population` for that given year (if available in the population dataset).
-   The below table shows an example of one row that might appear in the resulting table:
+---
 
-    | series_id   | year | period | value | Population |
-    |-------------|------|--------|-------|------------|
-    | PRS30006032 | 2018 | Q01    | 1.9   | 327167439  |
+## 📂 Project Structure
 
-    **Hints:** when working with public datasets you sometimes might have to perform some data cleaning first.
-   For example, you might find it useful to perform [trimming](https://stackoverflow.com/questions/35540974/remove-blank-space-from-data-frame-column-values-in-spark) of whitespaces before doing any filtering or joins
+```
+rearc-quest-mithlesh/
+│
+├── src/
+│   ├── common/
+│   │   ├── config.py
+│   │   ├── logger.py
+│   │   └── s3_utils.py
+│   │
+│   ├── part1/
+│   │   └── ingest_covid.py
+│   │
+│   ├── part2/
+│   │   └── ingest_countries.py
+│   │
+│   └── part3/
+│       └── analytics.py
+│
+├── Dockerfile
+├── requirements.txt
+└── README.md
+```
 
+---
 
-4. Submit your analysis, your queries, and the outcome of the reports as a [.ipynb](https://fileinfo.com/extension/ipynb) file.
+## ⚙️ Prerequisites
 
-#### Part 4: Infrastructure as Code & Data Pipeline with AWS CDK
-0. Using [AWS CloudFormation](https://aws.amazon.com/cloudformation/), [AWS CDK](https://aws.amazon.com/cdk/) or [Terraform](https://www.terraform.io/), create a data pipeline that will automate the steps above.
-1. The deployment should include a Lambda function that executes
-   Part 1 and Part 2 (you can combine both in 1 lambda function). The lambda function will be scheduled to run daily.
-2. The deployment should include an SQS queue that will be populated every time the JSON file is written to S3. (Hint: [S3 - Notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/NotificationHowTo.html))
-3. For every message on the queue - execute a Lambda function that outputs the reports from Part 3 (just logging the results of the queries would be enough. No .ipynb is required).
+* Python 3.9+
+* AWS Account (Free Tier)
+* AWS CLI configured
+* Docker Desktop
 
+Verify:
 
-### Q. Do I have to do all these?
-You can do as many as you like. We suspect though that once you start you won't be able to stop. It's addictive.
+```bash
+aws --version
+docker --version
+python --version
+```
 
-### Q. What do I have to submit?
-1. Link to data in S3 and source code (Step 1)
-2. Source code (Step 2)
-3. Source code in .ipynb file format and results (Step 3)
-4. Source code of the data pipeline infrastructure (Step 4)
-5. Any README or documentation you feel would help us navigate your quest.
+---
 
-### Q. How do I share the submission?
-Your submission should be emailed back to us as one or both of the following:
+## 🔐 AWS Configuration
 
-1. A link to a public hosted git repository in your own namespace
-1. A compressed file containing your project directory (zip, tgz, etc). Include the .git sub-directory if you used git.
+Configure credentials:
 
-### Q. What if I successfully complete all the steps?
-We have many more for you to solve as a member of the Rearc team!
+```bash
+aws configure
+```
 
-### Q. What if I fail?
-Do. Or do not. There is no fail.
+Confirm:
 
-### Q. Can I share this quest with others?
-No.
+```bash
+aws s3 ls
+```
 
-### Q. How do I get around the 403 error when I try to fetch BLS data?
-<details>
-<summary>Hint 1</summary>
-  The BLS data access policies can be found here: https://www.bls.gov/bls/pss.htm
-</details>
-<details>
-<summary>Hint 2</summary>
-  The policy page says:
+---
 
-```BLS also reserves the right to block robots that do not contain information that can be used to contact the owner. Blocking may occur in real time.```
+## 🪣 S3 Bucket
 
-How could you add information to your programmatic access requests to let BLS contact you?
-</details>
-<details>
-<summary>Hint 3</summary>
-  Adding a <code>User-Agent</code> header to your request with contact information will comply with the BLS data policies and allow you to keep accessing their data programmatically.
-</details>
+Create a bucket (example):
 
-### Q. Can I use AI to assist me?
-You may use AI as a reference tool but there will be a strong expectation to exhibit the same expertise and understanding from your submission in your interview. In addition we encourage you to be open about any usage! Please document what you used, what your prompts were, how it helped, what it got wrong, etc.
+```bash
+aws s3 mb s3://quest-mithlesh
+```
+
+Update bucket name in:
+
+```
+src/common/config.py
+```
+
+---
+
+## 🐍 Local Python Setup
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+# ▶ Part 1 – COVID Data Ingestion
+
+Uploads latest COVID time-series files to S3 and keeps them in sync.
+
+```bash
+python -m src.part1.ingest_covid
+```
+
+Verify:
+
+```bash
+aws s3 ls s3://quest-mithlesh/part1/covid_timeseries/
+```
+
+---
+
+# ▶ Part 2 – Countries Metadata Ingestion (Parquet)
+
+Runs inside Spark container.
+
+Build image:
+
+```bash
+docker build -t rearc-spark .
+```
+
+Run ingestion:
+
+```bash
+docker run -it \
+-v $(pwd):/app \
+-v ~/.aws:/root/.aws \
+-e PYTHONPATH=/app \
+-e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+-e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+rearc-spark \
+/opt/spark/bin/spark-submit \
+--conf spark.hadoop.fs.s3a.access.key=$AWS_ACCESS_KEY_ID \
+--conf spark.hadoop.fs.s3a.secret.key=$AWS_SECRET_ACCESS_KEY \
+/app/src/part2/ingest_countries.py
+```
+
+Verify:
+
+```bash
+aws s3 ls s3://quest-mithlesh/part2/countries_parquet/
+```
+
+You should see partitioned folders:
+
+```
+region=Asia/
+region=Europe/
+region=Africa/
+...
+```
+
+---
+
+# ▶ Part 3 – Spark Analytics (Docker)
+
+Produces Top 20 countries by infection rate.
+
+```bash
+docker run -it \
+-v $(pwd):/app \
+-v ~/.aws:/root/.aws \
+-e PYTHONPATH=/app \
+-e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+-e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+rearc-spark \
+/opt/spark/bin/spark-submit \
+--conf spark.hadoop.fs.s3a.access.key=$AWS_ACCESS_KEY_ID \
+--conf spark.hadoop.fs.s3a.secret.key=$AWS_SECRET_ACCESS_KEY \
+/app/src/part3/analytics.py
+```
+
+Verify output:
+
+```bash
+aws s3 ls s3://quest-mithlesh/part3/outputs/infection_rate_report/
+```
+
+---
+
+## 📊 Output Schema
+
+```
+country
+region
+population
+total_cases
+infection_rate_pct
+```
+
+---
+
+## 💡 Design Choices
+
+* Parquet for analytical storage
+* Partitioning by region
+* Broadcast join for small dimension table
+* Column pruning & early filtering
+* Dockerized Spark for reproducible execution
+* No hard-coded filenames
+* Idempotent ingestion
+
+---
+
+## 🔁 Re-running Pipeline
+
+The pipeline is safe to re-run:
+
+* Part 1 syncs only new files
+* Part 2 overwrites curated Parquet
+* Part 3 overwrites final report
+
+---
+
+## 🚀 Future Enhancements
+
+* Orchestration with Airflow / Step Functions
+* CI pipeline for linting & tests
+* Data quality checks
+* IAM role-based auth
+
+---
+
+If you want, next we can move to **Part 4 (Automation / IaC)** and add a lightweight orchestration layer.
