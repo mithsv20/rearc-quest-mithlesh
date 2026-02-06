@@ -1,9 +1,6 @@
 
 ---
 
-# ✅ Final README.md
-
-
 # Rearc Quest – Data Engineering Assignment
 
 ## Overview
