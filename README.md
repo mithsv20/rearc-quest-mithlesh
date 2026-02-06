@@ -1,251 +1,173 @@
 
 ---
 
-# 📘 Rearc Quest – Data Engineering Assignment
+# ✅ Final README.md
 
-This repository contains my solution for the Rearc Data Engineering Quest.
-The solution implements an end-to-end data pipeline that:
 
-* Ingests public COVID-19 time-series data
-* Ingests country metadata from a REST API
-* Stores curated datasets in Amazon S3
-* Computes analytics using Apache Spark
-* Produces a business-meaningful infection-rate report
+# Rearc Quest – Data Engineering Assignment
 
-The solution emphasizes scalability, idempotency, clean architecture, and production-style practices.
+## Overview
 
----
+This project implements an end-to-end, serverless data pipeline that ingests public COVID-19 and country metadata, stores the data in Amazon S3, and produces analytical reports showing countries with the highest COVID-19 infection rates.
 
-## 🏗 Architecture Overview
+The solution demonstrates:
 
-**Part 1**
-Ingest COVID time-series CSV files from public GitHub → S3
-
-**Part 2**
-Ingest country metadata (population, region) from REST Countries API → curated Parquet in S3 (partitioned by region)
-
-**Part 3**
-Spark analytics (Dockerized):
-
-* Aggregate latest confirmed cases by country
-* Join with population dataset
-* Compute infection rate (%)
-* Output Top 20 countries by infection rate
+- Modular Python and PySpark ingestion
+- Serverless orchestration using AWS Lambda, SQS, and EventBridge
+- Scalable analytics using Spark (locally) and lightweight Python analytics (Lambda)
+- Event-driven architecture and operational monitoring
 
 ---
 
-## 📂 Project Structure
+## Architecture
+
+Daily Schedule (EventBridge)  
+→ Lambda A (COVID + Countries ingestion)  
+→ S3 (raw datasets)  
+→ S3 Event Notification  
+→ SQS Queue  
+→ Lambda B (analytics & reporting)
+
+---
+
+## Project Structure
 
 ```
-rearc-quest-mithlesh/
+
+src/
+├── common/
+│     ├── config.py
+│     ├── logger.py
+│     └── s3_utils.py
 │
-├── src/
-│   ├── common/
-│   │   ├── config.py
-│   │   ├── logger.py
-│   │   └── s3_utils.py
-│   │
-│   ├── part1/
-│   │   └── ingest_covid.py
-│   │
-│   ├── part2/
-│   │   └── ingest_countries.py
-│   │
-│   └── part3/
-│       └── analytics.py
+├── part1/
+│     └── ingest_covid.py
 │
-├── Dockerfile
-├── requirements.txt
-└── README.md
+├── part2/
+│     ├── ingest_countries_python.py
+│     └── ingest_countries_spark.py
+│
+├── part3/
+│     ├── analytics_spark.py
+│     ├── analytics_pandas.py
+│     └── analytics_lambda.py
+│
+lambda/
+├── rearc-ingest-covid-and-countries/
+│     └── app.py
+└── rearc-generate-infection-report/
+      └── app.py
+
 ```
 
 ---
 
-## ⚙️ Prerequisites
+## Local Setup
 
-* Python 3.9+
-* AWS Account (Free Tier)
-* AWS CLI configured
-* Docker Desktop
+### Prerequisites
 
-Verify:
+- Python 3.11
+- pip
+- AWS CLI configured
+- Java 11+ (for Spark)
+- PySpark (for Spark-based analytics)
 
-```bash
-aws --version
-docker --version
-python --version
-```
-
----
-
-## 🔐 AWS Configuration
-
-Configure credentials:
+### Install Dependencies
 
 ```bash
-aws configure
-```
-
-Confirm:
-
-```bash
-aws s3 ls
-```
-
----
-
-## 🪣 S3 Bucket
-
-Create a bucket (example):
-
-```bash
-aws s3 mb s3://quest-mithlesh
-```
-
-Update bucket name in:
-
-```
-src/common/config.py
-```
-
----
-
-## 🐍 Local Python Setup
-
-```bash
-python -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
-```
+````
 
 ---
 
-# ▶ Part 1 – COVID Data Ingestion
+## Run Locally
 
-Uploads latest COVID time-series files to S3 and keeps them in sync.
+### Part 1 – Ingest COVID Data
 
 ```bash
 python -m src.part1.ingest_covid
 ```
 
-Verify:
+### Part 2 – Ingest Countries (Python)
 
 ```bash
-aws s3 ls s3://quest-mithlesh/part1/covid_timeseries/
+python -m src.part2.ingest_countries_python
 ```
 
----
-
-# ▶ Part 2 – Countries Metadata Ingestion (Parquet)
-
-Runs inside Spark container.
-
-Build image:
+### Part 3 – Analytics (Pandas)
 
 ```bash
-docker build -t rearc-spark .
+python -m src.part3.analytics_pandas
 ```
 
-Run ingestion:
+### Part 3 – Analytics (Spark)
 
 ```bash
-docker run -it \
--v $(pwd):/app \
--v ~/.aws:/root/.aws \
--e PYTHONPATH=/app \
--e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
--e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-rearc-spark \
-/opt/spark/bin/spark-submit \
---conf spark.hadoop.fs.s3a.access.key=$AWS_ACCESS_KEY_ID \
---conf spark.hadoop.fs.s3a.secret.key=$AWS_SECRET_ACCESS_KEY \
-/app/src/part2/ingest_countries.py
-```
-
-Verify:
-
-```bash
-aws s3 ls s3://quest-mithlesh/part2/countries_parquet/
-```
-
-You should see partitioned folders:
-
-```
-region=Asia/
-region=Europe/
-region=Africa/
-...
+python -m src.part3.analytics_spark
 ```
 
 ---
 
-# ▶ Part 3 – Spark Analytics (Docker)
+## AWS Deployment (Console)
 
-Produces Top 20 countries by infection rate.
+### Lambda A – Ingestion
 
-```bash
-docker run -it \
--v $(pwd):/app \
--v ~/.aws:/root/.aws \
--e PYTHONPATH=/app \
--e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
--e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-rearc-spark \
-/opt/spark/bin/spark-submit \
---conf spark.hadoop.fs.s3a.access.key=$AWS_ACCESS_KEY_ID \
---conf spark.hadoop.fs.s3a.secret.key=$AWS_SECRET_ACCESS_KEY \
-/app/src/part3/analytics_lambda.py
-```
-
-Verify output:
-
-```bash
-aws s3 ls s3://quest-mithlesh/part3/outputs/infection_rate_report/
-```
-
----
-
-## 📊 Output Schema
+* Runtime: Python 3.11
+* Handler:
 
 ```
-country
-region
-population
-total_cases
-infection_rate_pct
+lambda.rearc-ingest-covid-and-countries.app.lambda_handler
 ```
 
----
+* Layer: requests
 
-## 💡 Design Choices
+### Lambda B – Analytics
 
-* Parquet for analytical storage
-* Partitioning by region
-* Broadcast join for small dimension table
-* Column pruning & early filtering
-* Dockerized Spark for reproducible execution
-* No hard-coded filenames
-* Idempotent ingestion
+* Runtime: Python 3.11
+* Handler:
 
----
+```
+lambda.rearc-generate-infection-report.app.lambda_handler
+```
 
-## 🔁 Re-running Pipeline
-
-The pipeline is safe to re-run:
-
-* Part 1 syncs only new files
-* Part 2 overwrites curated Parquet
-* Part 3 overwrites final report
+* Layer: requests
 
 ---
 
-## 🚀 Future Enhancements
+## Event Wiring
 
-* Orchestration with Airflow / Step Functions
-* CI pipeline for linting & tests
-* Data quality checks
-* IAM role-based auth
+1. EventBridge rule triggers Lambda A daily
+2. S3 bucket sends ObjectCreated events (part2/countries/*.json) to SQS
+3. SQS triggers Lambda B
 
 ---
 
-If you want, next we can move to **Part 4 (Automation / IaC)** and add a lightweight orchestration layer.
+## Monitoring
+
+* CloudWatch Alarm on Lambda B Errors
+* SNS Email notifications for failures
+
+---
+
+## Output
+
+Lambda B logs top 20 countries by infection rate:
+
+```
+country | region | population | total_cases | infection_rate_pct
+```
+
+Logs are available in CloudWatch.
+
+---
+
+## Notes
+
+* Spark implementation is included for scalable analytics.
+* Pure Python implementation is used in Lambda for reliability and minimal dependencies.
+* No hard-coded filenames are used; the pipeline dynamically discovers data in S3.
+
+---
+
+## Author
+Mithlesh Vishwakarma
