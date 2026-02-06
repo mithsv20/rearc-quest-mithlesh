@@ -194,7 +194,7 @@ rearc-spark \
 /opt/spark/bin/spark-submit \
 --conf spark.hadoop.fs.s3a.access.key=$AWS_ACCESS_KEY_ID \
 --conf spark.hadoop.fs.s3a.secret.key=$AWS_SECRET_ACCESS_KEY \
-/app/src/part3/analytics.py
+/app/src/part3/analytics_lambda.py
 ```
 
 Verify output:

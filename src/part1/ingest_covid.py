@@ -26,7 +26,7 @@ def fetch_source_filenames():
     ]
 
 
-def main():
+def run():
     logger.info("Fetching file list from GitHub API...")
     source_files = fetch_source_filenames()
 
@@ -58,4 +58,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run()

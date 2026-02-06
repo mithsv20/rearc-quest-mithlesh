@@ -1,60 +1,45 @@
-import requests
 import json
-
-from pyspark.sql import SparkSession
+import requests
 
 from src.common.config import S3_BUCKET, COUNTRIES_API_URL
+from src.common.s3_utils import upload_text, list_keys
 from src.common.logger import get_logger
 
 logger = get_logger("countries_ingestion")
 
-S3_PATH = f"s3a://{S3_BUCKET}/part2/countries_parquet/"
+S3_PREFIX = "part2/countries/"
 
 
-def main():
-    spark = (
-        SparkSession.builder
-        .appName("countries-ingestion")
-        .getOrCreate()
-    )
-
+def run():
     logger.info("Fetching countries dataset")
+    r = requests.get(COUNTRIES_API_URL)
+    r.raise_for_status()
 
-    response = requests.get(COUNTRIES_API_URL)
-    response.raise_for_status()
-    countries = response.json()  # list of dicts
+    countries = r.json()
 
-    # Convert each country object to JSON string
-    rdd = spark.sparkContext.parallelize(
-        [json.dumps(c) for c in countries]
-    )
+    existing_keys = list_keys(S3_BUCKET, S3_PREFIX)
+    existing_files = {k.split("/")[-1] for k in existing_keys}
 
-    raw_df = spark.read.json(rdd)
+    for country in countries:
+        code = country.get("cca3")
+        if not code:
+            continue
 
-    curated = (
-        raw_df
-        .selectExpr(
-            "name.common as country",
-            "cca3 as country_code",
-            "population",
-            "region"
+        filename = f"{code}.json"
+
+        if filename in existing_files:
+            continue
+
+        upload_text(
+            S3_BUCKET,
+            f"{S3_PREFIX}{filename}",
+            json.dumps(country)
         )
-        .filter("population is not null")
-    )
 
-    (
-        curated
-        .repartition("region")
-        .write
-        .mode("overwrite")
-        .partitionBy("region")
-        .parquet(S3_PATH)
-    )
+        logger.info(f"Uploaded {filename}")
 
-    logger.info("Countries written to parquet successfully")
-
-    spark.stop()
+    logger.info("Countries ingestion complete")
 
 
 if __name__ == "__main__":
-    main()
+    run()
